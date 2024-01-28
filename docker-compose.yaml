@@ -1,0 +1,58 @@
+version: "3"
+services:
+  influxdb:
+    image: influxdb:2.7.1
+    container_name: influxdb
+    volumes:
+      # Make sure you create these local directories
+      - ./influxdb/data:/var/lib/influxdb2:rw
+      - ./influxdb/config:/etc/influxdb2
+    ports:
+      - 8086:8086
+    restart: unless-stopped
+    networks:
+      - mqtt5_tig-network
+    healthcheck:
+      test: "curl -f http://localhost:8086/ping"
+      interval: 5s
+      timeout: 10s
+      retries: 5
+ 
+  telegraf:
+    image: telegraf:1.28.3
+    container_name: telegraf
+    user: "1000:1000"
+    environment: 
+      - MQTT_HOST_ADDR=mqtt5
+      - MQTT_HOST_PORT=1883
+      - INFLUXDB_HOST_ADDR=influxdb
+      - INFLUXDB_HOST_PORT=8086
+    volumes:
+      # Make sure you create this local directory
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+    restart: unless-stopped
+    networks:
+      - mqtt5_tig-network
+    depends_on:
+      # Waits until influxdb container is up
+      influxdb:
+        condition: service_healthy
+ 
+  grafana:
+    image: grafana/grafana-oss:9.5.14
+    container_name: grafana
+    user: '472:472'
+    ports:
+      - 3000:3000
+    volumes:
+      # Make sure you create these local directories
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/config:/etc/grafana
+      - ./grafana/log:/var/log/grafana
+    restart: unless-stopped
+    networks:
+      - mqtt5_tig-network
+
+networks:
+  mqtt5_tig-network: 
+    external: true
